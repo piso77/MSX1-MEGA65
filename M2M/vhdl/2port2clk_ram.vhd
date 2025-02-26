@@ -31,6 +31,7 @@ entity dualport_2clk_ram is
       data_a          : in  std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
       wren_a          : in  std_logic := '0';
       q_a             : out std_logic_vector(DATA_WIDTH-1 downto 0);
+      cs_a            : in std_logic := '1';
 
       clock_b         : in  std_logic := '0';
       address_b       : in  std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
@@ -55,7 +56,11 @@ architecture beh of dualport_2clk_ram is
       end if;
    end function to_stdlogic;
 
+   signal q0 : std_logic_vector((DATA_WIDTH - 1) downto 0);
+
 begin
+
+   q_a <= q0 when cs_a = '1' else (others => '1');
 
    -- Optional latch management for A and B
    latch_address_a : process (clock_a, address_a)
@@ -114,7 +119,7 @@ begin
          address_a => address_a_int,
          data_a    => data_a,
          wren_a    => wren_a,
-         q_a       => q_a,
+         q_a       => q0,
          clock_b   => clock_b xor to_stdlogic(FALLING_B),
          clen_b    => '1',
          address_b => address_b_int,

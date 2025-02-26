@@ -1,11 +1,11 @@
 ----------------------------------------------------------------------------------
--- VIC 20 for MEGA65
+-- C16 / Plus4 for MEGA65
 --
 -- MEGA65 main file that contains the whole machine
 --
--- based on VIC20_MiSTer by the MiSTer development team
--- powered by MiSTer2MEGA65 done by sy2002 and MJoergen in 2023
--- port done by MJoergen in 2024 and licensed under GPL v3
+-- based on VIC20MEGA65 by MJoergen and sy2002 in 2023
+-- based on C16_MiSTer by the MiSTer development team
+-- port done by Paolo Pisati <p.pisati@gmail.com> in 2026 and licensed under GPL v3
 ----------------------------------------------------------------------------------
 
 library ieee;
@@ -243,35 +243,37 @@ architecture synthesis of mega65_core is
    ---------------------------------------------------------------------------------------------
 
    -- OSM selections within qnice_osm_control_i
-   constant C_MENU_RAM_0400      : natural := 10;
-   constant C_MENU_RAM_2000      : natural := 11;
-   constant C_MENU_RAM_4000      : natural := 12;
-   constant C_MENU_RAM_6000      : natural := 13;
-   constant C_MENU_RAM_A000      : natural := 14;
+   constant C_MENU_MODEL_C16     : natural := 10;
+   constant C_MENU_MODEL_PLUS4   : natural := 11;
+   constant C_MENU_SID_NONE      : natural := 17;
+   constant C_MENU_SID_6581      : natural := 18;
+   constant C_MENU_SID_8580      : natural := 19;
    constant C_MENU_FLIP_JOYS     : natural := 22;
    constant C_MENU_IMPROVE_AUDIO : natural := 23;
    constant C_MENU_IEC           : natural := 24;
-   constant C_MENU_CENTER_HORZ   : natural := 25;
-   constant C_MENU_CENTER_VERT   : natural := 26;
-   constant C_MENU_HDMI_16_9_50  : natural := 33;
-   constant C_MENU_HDMI_16_9_60  : natural := 34;
-   constant C_MENU_HDMI_4_3_50   : natural := 35;
-   constant C_MENU_HDMI_5_4_50   : natural := 36;
-   constant C_MENU_HDMI_640_60   : natural := 37;
-   constant C_MENU_HDMI_720_5994 : natural := 38;
-   constant C_MENU_HDMI_800_60   : natural := 39;
-   constant C_MENU_HDMI_FF       : natural := 41;
-   constant C_MENU_HDMI_DVI      : natural := 42;
-   constant C_MENU_CRT_EMULATION : natural := 45;
-   constant C_MENU_HDMI_ZOOM     : natural := 46;
-   constant C_MENU_VGA_STD       : natural := 50;
-   constant C_MENU_VGA_15KHZHSVS : natural := 54;
-   constant C_MENU_VGA_15KHZCS   : natural := 55;
-   subtype  c_menu_osm_scaling is natural range 67 downto 59;
+   constant C_MENU_HDMI_16_9_50  : natural := 31;
+   constant C_MENU_HDMI_16_9_60  : natural := 32;
+   constant C_MENU_HDMI_4_3_50   : natural := 33;
+   constant C_MENU_HDMI_5_4_50   : natural := 34;
+   constant C_MENU_HDMI_640_60   : natural := 35;
+   constant C_MENU_HDMI_720_5994 : natural := 36;
+   constant C_MENU_HDMI_800_60   : natural := 37;
+   constant C_MENU_HDMI_FF       : natural := 39;
+   constant C_MENU_HDMI_DVI      : natural := 40;
+   constant C_MENU_CRT_EMULATION : natural := 43;
+   constant C_MENU_HDMI_ZOOM     : natural := 44;
+   constant C_MENU_VGA_STD       : natural := 48;
+   constant C_MENU_VGA_15KHZHSVS : natural := 52;
+   constant C_MENU_VGA_15KHZCS   : natural := 53;
+   subtype  c_menu_osm_scaling is natural range 65 downto 57;
 
    signal   qnice_conf_wr : std_logic;
    signal   qnice_conf_ai : std_logic_vector(15 downto 0);
    signal   qnice_conf_di : std_logic_vector(7 downto 0);
+
+   signal   main_sid_type : std_logic_vector(1 downto 0);
+
+   signal   main_model: std_logic;
 
    -- QNICE signals passed down to main.vhd to handle IEC drives using vdrives.vhd
    signal   qnice_iec_qnice_ce   : std_logic;
@@ -321,10 +323,6 @@ begin
    hr_core_byteenable_o <= (others => '0');
    hr_core_burstcount_o <= (others => '0');
 
-   ---------------------------------------------------------------------------------------------
-   -- main_clk (VIC20 MiSTer Core clock)
-   ---------------------------------------------------------------------------------------------
-
    -- Tristate all expansion port drivers that we can directly control
    -- @TODO: As soon as we support modules that can act as busmaster, we need to become more flexible here
    cart_ctrl_oe_o       <= '0';
@@ -365,6 +363,13 @@ begin
    main_power_led_col_o <= x"0000FF" when main_reset_m2m_i else
                            x"00FF00";
 
+   main_sid_type <= "01" when main_osm_control_i(C_MENU_SID_6581) else
+                    "10" when main_osm_control_i(C_MENU_SID_8580) else
+                    "00"; -- C_MENU_SID_NONE, default state
+
+   main_model <= '1' when main_osm_control_i(C_MENU_MODEL_PLUS4) else
+                 '0'; -- C_MENU_MODEL_C16, default state
+
    -- main.vhd contains the actual MiSTer core
    main_inst : entity work.main
       generic map (
@@ -385,16 +390,6 @@ begin
          ---------------------------
          -- Configuration options
          ---------------------------
-
-         vic20_rom_i            => '0',         -- standard
-         ram_ext_i              => main_osm_control_i(C_MENU_RAM_A000) &
-                                   main_osm_control_i(C_MENU_RAM_6000) &
-                                   main_osm_control_i(C_MENU_RAM_4000) &
-                                   main_osm_control_i(C_MENU_RAM_2000) &
-                                   main_osm_control_i(C_MENU_RAM_0400),
-
-         center_i               => main_osm_control_i(C_MENU_CENTER_VERT) &
-                                   main_osm_control_i(C_MENU_CENTER_HORZ),
 
          clk_main_speed_i       => CORE_CLK_SPEED,
          video_retro15khz_i     => main_osm_control_i(C_MENU_VGA_15KHZHSVS) or main_osm_control_i(C_MENU_VGA_15KHZCS),
@@ -448,8 +443,11 @@ begin
          -- Audio output (PCM format, signed values)
          audio_left_o           => main_audio_left_o,
          audio_right_o          => main_audio_right_o,
+         sid_type_i             => main_sid_type,
 
-         -- VIC20 drive led
+         model_i                => main_model,
+
+         -- C16 drive led
          drive_led_o            => main_drive_led_o,
          drive_led_col_o        => main_drive_led_col_o,
 
@@ -555,8 +553,8 @@ begin
 
       case qnice_dev_id_i is
 
-         -- VIC20 RAM
-         when C_DEV_VIC20_RAM =>
+         -- C16 RAM
+         when C_DEV_C16_RAM =>
             qnice_conf_ai <= qnice_dev_addr_i(15 downto 0);
             qnice_conf_wr <= qnice_dev_we_i;
             qnice_conf_di <= qnice_dev_data_i(7 downto 0);

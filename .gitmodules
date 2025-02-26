@@ -1,6 +1,3 @@
 [submodule "QNICE"]
 	path = M2M/QNICE
 	url = https://github.com/sy2002/QNICE-FPGA
-[submodule "CORE/VIC20_MiSTer"]
-	path = CORE/VIC20_MiSTer
-	url = git@github.com:MJoergen/VIC20_MiSTer.git

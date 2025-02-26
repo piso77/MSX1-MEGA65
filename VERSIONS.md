@@ -1,23 +1,36 @@
-Version 1 - March 20, 2024
-=============================
+C16 / Plus4 for MEGA65
 
-Experience the VIC 20 with great accuracy and sublime compatibility
-on your MEGA65! It can run a ton of games and demos and it offers convenient
-features.
+Version 1.0 - 17 Apr 2026
+=========================
+
+Maintenance release aimed at fixing the keyboard, removing all alien OSM
+entries and adding SID sound card mixing.
+
+## New features
+
+* SID sound card support
+
+* C16 and Plus4 profile (no functional differences)
+
+# Bug fixes
+
+* Keyboard (largely) fixed
+
+* OSM cleanup
+
+Version 0.1 - 21 March 2026 WIP
+===============================
 
 ## Features
 
-* PAL standard VIC 20 (running standard KERNAL and standard C1541 DOS)
-* PAL 720 x 576 pixels (4:3) @ 50 Hz via VGA: for a true retro feeling
-* 720p @ 50 Hz or 60 Hz (16:9) via HDMI: for convenience
+* PAL standard C16
+* 720 x 576 pixels (4:3) via VGA
+* 720p @ 50 Hz or 60 Hz (16:9) via HDMI
 * Sound output via 3.5mm jack and via HDMI
-* MEGA65 keyboard support (including cursor keys)
+* VERY BUGGY MEGA65 keyboard support
 * Joystick support
-* On-Screen-Menu via Help button to mount drives and to configure options
-* C1541 read-only support: Mount standard `*.D64` via SD card to drive 8
-* Drive led during virtual disk access
-* CRT filter: Optional visual scanlines on HDMI so that the output looks more
-  like an old monitor or TV
-* Crop/Zoom: On HDMI, you can optionally crop the top and bottom border of
-  the VIC20's output and zoom in, so that the 16:9 screen real-estate is
-  utilized more efficiently. Great for games.
+
+## Bugs / limitations
+* Several keyboard issues: arrow keys not implemented, SHIFT + other key often not
+  working, etc
+* Only D64 + PRG support

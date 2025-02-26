@@ -1,33 +1,29 @@
-VIC 20 for MEGA65 aka VIC20MEGA65
+C16 / Plus4 for MEGA65 aka C16-MEGA65
 =====================================
 
-done in 2024 by
-    * MJoergen   github.com/MJoergen
+done in 2026 by
+    * Paolo Pisati <p.pisati@gmail.com>   https://github.com/piso77/C16-MEGA65
 
-VIC20MEGA65 is licensed under the terms of GNU/GPL v3, for more information please read the file LICENSE.
-Parts of VIC20MEGA65 are licensed under other Free-software licenses as described in the source code.
+C16-MEGA65 is licensed under the terms of GNU/GPL v3, for more information please read the file LICENSE.
+Parts of C16-MEGA65 are licensed under other Free-software licenses as described in the source code.
 
-Special thanks for countless hours of testing, sparring, advise and other
-valuable support (in alphabetical order): deft, sy2002.
-
-Special thanks to Adam Barnes for not only creating the most awesome Open Source HDMI core on the
-planet (see below) but also for patiently sharing his wisdom and tirelessly supporting us in improving
-our HyperRAM controller.
-
-VIC20MEGA65:
+C16-MEGA65:
 ----------
 
-  VIC20MEGA65 is a port of MiSTer's VIC20_MiSTer
+  C16-MEGA65 is a port of MiSTer's C16_MiSTer
       done by the MiSTer Development Team
-      Original GitHub Repository: https://github.com/MiSTer-devel/VIC20_MiSTer
+      Original GitHub Repository: https://github.com/MiSTer-devel/C16_MiSTer
       Significant contributors:
       * sorgelig
 
   The 6510/6502 CPU is based on T65
       done by Daniel Wallner, Mike Johnson, Wolfgang Scherr, Morten Leikvoll
 
-Other than that and our own work, VIC20MEGA65 uses:
+Other than that and our own work, C16-MEGA65 uses:
 -------------------------------------------------
+
+  * VIC20MEGA65 by Mjoergen
+    https://github.com/MJoergen/VIC20MEGA65
 
   * MiSTer2MEGA65 by The MiSTer2MEGA65 Development Team
     https://github.com/sy2002/MiSTer2MEGA65
@@ -64,17 +60,4 @@ Other than that and our own work, VIC20MEGA65 uses:
 
   * PSF font to C include file converter psftools-1.1.1 by John Elliott
     https://www.seasip.info/Unix/PSF/
-
-The following resources and tools were invaluable for developing VIC20MEGA65:
----------------------------------------------------------------------------
-
-  * Book "Die Floppy 1541" by Karsten Schramm
-    Special thanks to Spiro Trikaliotis, who made it legally available online:
-    https://spiro.trikaliotis.net/Book#vic1541
-
-  * All About Your 1541 by Ninja/The Dreams:
-    https://www.the-dreams.de/aay.html
-
-  * "Emulator file formats", chapter 17 of the Vice emulator's user manual:
-    https://vice-emu.sourceforge.io/vice_17.html#SEC351
 

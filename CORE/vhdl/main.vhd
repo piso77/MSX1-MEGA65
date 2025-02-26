@@ -1,10 +1,11 @@
 ----------------------------------------------------------------------------------
--- VIC 20 for MEGA65
+-- C16 / Plus4 for MEGA65
 --
 -- Wrapper for the MiSTer core that runs exclusively in the core's clock domanin
 --
--- based on VIC20_MiSTer by the MiSTer development team
--- port done by MJoergen and sy2002 in 2023 and licensed under GPL v3
+-- based on VIC20MEGA65 by MJoergen and sy2002 in 2023
+-- based on C16_MiSTer by the MiSTer development team
+-- port done by Paolo Pisati <p.pisati@gmail.com> in 2026 and licensed under GPL v3
 ----------------------------------------------------------------------------------
 
 library ieee;
@@ -36,18 +37,13 @@ entity main is
       -- Configuration options
       ---------------------------
 
-      -- Select VIC20's ROM: 0=Custom, 1=Standard
-      vic20_rom_i            : in    std_logic;
-      ram_ext_i              : in    std_logic_vector(4 downto 0);
-      center_i               : in    std_logic_vector(1 downto 0);
-
       -- MiSTer core main clock speed:
       -- Make sure you pass very exact numbers here, because they are used for avoiding clock drift at derived clocks
       clk_main_speed_i       : in    natural;
       video_retro15khz_i     : in    std_logic;
 
       ---------------------------
-      -- VIC 20 I/O ports
+      -- C16 I/O ports
       ---------------------------
 
       -- M2M Keyboard interface
@@ -94,8 +90,11 @@ entity main is
       -- Audio output (Signed PCM)
       audio_left_o           : out   signed(15 downto 0);
       audio_right_o          : out   signed(15 downto 0);
+      sid_type_i             : in    std_logic_vector(1 downto 0);
 
-      -- VIC20 drive led (color is RGB)
+      model_i                : in    std_logic;
+
+      -- C16 drive led (color is RGB)
       drive_led_o            : out   std_logic;
       drive_led_col_o        : out   std_logic_vector(23 downto 0);
 
@@ -131,26 +130,17 @@ end entity main;
 
 architecture synthesis of main is
 
-   -- Generic MiSTer VIC20 signals
+   -- Generic MiSTer C16 signals
    signal   drive_led : std_logic;
 
-   -- directly connect the VIC20's CIA1 to the emulated keyboard matrix within keyboard.vhd
-   signal   cia1_pa_in  : std_logic_vector(7 downto 0);
-   signal   cia1_pa_out : std_logic_vector(7 downto 0);
-   signal   cia1_pb_in  : std_logic_vector(7 downto 0);
-   signal   cia1_pb_out : std_logic_vector(7 downto 0);
+   signal   o_audio : std_logic_vector(15 downto 0);
 
-   signal   o_audio : std_logic_vector(5 downto 0);
-
-   -- the Restore key is special : it creates a non maskable interrupt (NMI)
-   signal   restore_key_n : std_logic;
-
-   -- VIC20's IEC signals
-   signal   vic20_iec_clk_out  : std_logic;
-   signal   vic20_iec_clk_in   : std_logic;
-   signal   vic20_iec_atn_out  : std_logic;
-   signal   vic20_iec_data_out : std_logic;
-   signal   vic20_iec_data_in  : std_logic;
+   -- C16's IEC signals
+   signal   c16_iec_clk_out  : std_logic;
+   signal   c16_iec_clk_in   : std_logic;
+   signal   c16_iec_atn_out  : std_logic;
+   signal   c16_iec_data_out : std_logic;
+   signal   c16_iec_data_in  : std_logic;
 
    -- Hardware IEC port
    signal   hw_iec_clk_n_in  : std_logic;
@@ -184,17 +174,16 @@ architecture synthesis of main is
    signal   iec_par_data_in     : std_logic_vector(7 downto 0);
    signal   iec_par_data_out    : std_logic_vector(7 downto 0);
 
-   -- unprocessed video output of the VIC20 core
+   -- unprocessed video output of the C16 core
    signal   vga_hs    : std_logic;
    signal   vga_vs    : std_logic;
    signal   vga_red   : std_logic_vector(3 downto 0);
    signal   vga_green : std_logic_vector(3 downto 0);
    signal   vga_blue  : std_logic_vector(3 downto 0);
    signal   div       : unsigned(1 downto 0);
-   signal   v20_en    : std_logic;
    signal   div_ovl   : unsigned(0 downto 0);
 
-   -- clock enable to derive the VIC20's pixel clock from the core's main clock
+   -- clock enable to derive the C16's pixel clock from the core's main clock
    signal   video_ce   : std_logic;
    signal   video_ce_d : std_logic;
 
@@ -203,6 +192,35 @@ architecture synthesis of main is
 
    constant C_HARD_RST_DELAY : natural := 100_000; -- roundabout 1/30 of a second
    signal   hard_rst_counter : natural := 0;
+
+   signal romv : std_logic := '0'; -- C16 rom version
+
+   -- openbus logic, ram/rom selector and signals
+   signal c16_addr : std_logic_vector(15 downto 0);
+   signal c16_din : std_logic_vector(7 downto 0);
+   signal c16_dout : std_logic_vector(7 downto 0);
+   signal c16_rnw : std_logic;
+   signal cs_ram, cs0, cs1, cs_io : std_logic;
+
+   signal c16_datalatch : std_logic_vector(7 downto 0);
+   signal openbus_data : std_logic_vector(7 downto 0);
+   signal openbus_sel : std_logic;
+
+   signal ram_dout : std_logic_vector(7 downto 0);
+   signal ram_we : std_logic;
+
+   signal roml : std_logic_vector(1 downto 0);
+   signal romh : std_logic_vector(1 downto 0);
+
+   signal kernal0_dout : std_logic_vector(7 downto 0);
+   signal kernal1_dout : std_logic_vector(7 downto 0);
+   signal basic_dout : std_logic_vector(7 downto 0);
+   signal fl_dout : std_logic_vector(7 downto 0);
+   signal fh_dout : std_logic_vector(7 downto 0);
+
+   signal kern : std_logic;
+
+   signal joy0, joy1 : std_logic_vector(4 downto 0);
 
 begin
 
@@ -257,92 +275,221 @@ begin
    end process hard_reset_proc;
 
 
-   video_hs_o      <= not vga_hs;
-   video_vs_o      <= not vga_vs;
-
-   v20_en_proc : process (clk_main_i)
-   begin
-      if falling_edge(clk_main_i) then
-         div    <= div + 1;
-         v20_en <= and(div);
-      end if;
-   end process v20_en_proc;
-
    --------------------------------------------------------------------------------------------------
-   -- MiSTer VIC 20 core / main machine
+   -- RAM
    --------------------------------------------------------------------------------------------------
 
-   vic20_inst : entity work.vic20
+   -- C16's RAM modelled as dual clock & dual port RAM so that the Commodore 16 core
+   -- as well as QNICE can access it
+   c16_ram : entity work.dualport_2clk_ram
+      generic map (
+         ADDR_WIDTH        => 16,
+         DATA_WIDTH        => 8,
+         FALLING_A         => false,      -- C64 expects read/write to happen at the rising clock edge
+         FALLING_B         => true        -- QNICE expects read/write to happen at the falling clock edge
+      )
       port map (
-         i_sysclk      => clk_main_i,
-         i_sysclk_en   => v20_en,
-         i_reset       => reset_soft_i or reset_hard_i,
-         i_restore_n   => restore_key_n,
-         o_p2h         => open,
-         i_ram_ext_ro  => "00000",   -- read-only region if set
-         i_ram_ext     => ram_ext_i, -- at $A000(8k),$6000(8k),$4000(8k),$2000(8k),$0400(3k)
-         i_extmem_en   => '0',
-         o_extmem_sel  => open,
-         o_extmem_r_wn => open,
-         o_extmem_addr => open,
-         i_extmem_data => x"00",
-         o_extmem_data => open,
-         o_io2_sel     => open,
-         o_io3_sel     => open,
-         o_blk123_sel  => open,
-         o_blk5_sel    => open,
-         o_ram123_sel  => open,
+         -- C16 MiSTer core
+         clock_a           => clk_main_i,
+         address_a         => c16_addr,
+         data_a            => c16_dout,
+         wren_a            => ram_we,
+         q_a               => ram_dout,
+         cs_a              => not cs_ram,
 
-         -- keyboard interface: directly connect the CIA1
-         cia1_pa_i     => cia1_pa_in(0) & cia1_pa_in(6 downto 1) & cia1_pa_in(7),
-         cia1_pa_o     => cia1_pa_out,
-         cia1_pb_i     => cia1_pb_in(3) & cia1_pb_in(6 downto 4) & cia1_pb_in(7) & cia1_pb_in(2 downto 0),
-         cia1_pb_o     => cia1_pb_out,
+         -- QNICE
+         clock_b           => conf_clk_i,
+         address_b         => conf_ai_i,
+         data_b            => conf_di_i,
+         wren_b            => conf_wr_i
+      ); -- c16_ram
+
+   process(clk_main_i)
+       variable old_cs : std_logic := '0';
+   begin
+       if rising_edge(clk_main_i) then
+           ram_we <= '0';
+           if old_cs = '1' and cs_ram = '0' then
+               ram_we <= not c16_rnw;
+           end if;
+           old_cs := cs_ram;
+       end if;
+   end process;
+
+   --------------------------------------------------------------------------------------------------
+   -- ROM
+   --------------------------------------------------------------------------------------------------
+
+   kernal0 : entity work.gen_rom
+      generic map (
+         ADDR_WIDTH        => 14,
+         INIT_FILE         => "../../CORE/C16_MiSTer/rtl/roms/c16_kernal.mif.hex"
+      )
+      port map (
+         rdclock           => clk_main_i,
+         wrclock           => clk_main_i,
+         rdaddress         => c16_addr(13 downto 0),
+         q                 => kernal0_dout,
+         cs                => (not cs1) and ((not (romh(1) or romh(0))) or kern) and (not romv) -- XXX romh = "00"
+      );
+
+   kernal1 : entity work.gen_rom
+      generic map (
+         ADDR_WIDTH        => 14,
+         INIT_FILE         => "../../CORE/C16_MiSTer/rtl/roms/c16_kernal.mif.hex"
+      )
+      port map (
+         rdclock           => clk_main_i,
+         wrclock           => clk_main_i,
+         rdaddress         => c16_addr(13 downto 0),
+         q                 => kernal1_dout,
+         cs                => (not cs1) and ((not (romh(1) or romh(0))) or kern) and romv -- XXX romh = "00"
+      );
+
+   basic : entity work.gen_rom
+      generic map (
+         ADDR_WIDTH        => 14,
+         INIT_FILE         => "../../CORE/C16_MiSTer/rtl/roms/c16_basic.mif.hex"
+      )
+      port map (
+         rdclock           => clk_main_i,
+         wrclock           => clk_main_i,
+         rdaddress         => c16_addr(13 downto 0),
+         q                 => basic_dout,
+         cs                => (not cs0) and ((not (roml(1) or roml(0)))) -- XXX roml = "00"
+      );
+
+   funcl : entity work.gen_rom
+      generic map (
+         ADDR_WIDTH        => 14,
+         INIT_FILE         => "../../CORE/C16_MiSTer/rtl/roms/3-plus-1_low.mif.hex"
+      )
+      port map (
+         rdclock           => clk_main_i,
+         wrclock           => clk_main_i,
+         rdaddress         => c16_addr(13 downto 0),
+         q                 => fl_dout,
+         cs                => (not cs0) and (roml(1) and (not roml(0))) -- XXX roml = 2
+      );
+
+   funch : entity work.gen_rom
+      generic map (
+         ADDR_WIDTH        => 14,
+         INIT_FILE         => "../../CORE/C16_MiSTer/rtl/roms/3-plus-1_high.mif.hex"
+      )
+      port map (
+         rdclock           => clk_main_i,
+         wrclock           => clk_main_i,
+         rdaddress         => c16_addr(13 downto 0),
+         q                 => fh_dout,
+         cs                => (not cs1) and (romh(1) and (not romh(0))) and (not kern) -- XXX romh = 2
+      );
+
+
+
+   kern <= '1' when c16_addr(15 downto 8) = x"FC" else '0';
+
+   process(clk_main_i)
+       variable old_cs : std_logic := '0';
+   begin
+       if rising_edge(clk_main_i) then
+           if (reset_soft_i or reset_hard_i) then -- XXX wrong reset, check it
+               romh <= "00";
+               roml <= "00";
+           elsif model_i = '1' and old_cs = '1' and cs_io = '0' and c16_rnw = '0' and c16_addr(15 downto 4) = x"FDD" then
+               romh <= c16_addr(3 downto 2);
+               roml <= c16_addr(1 downto 0);
+           end if;
+           old_cs := cs_io;
+       end if;
+   end process;
+
+   --------------------------------------------------------------------------------------------------
+   -- MiSTer C16 core / main machine
+   --------------------------------------------------------------------------------------------------
+
+   c16_din <= ram_dout      and
+              kernal0_dout  and
+              kernal1_dout  and
+              basic_dout    and
+              fh_dout       and
+              fl_dout       and
+   --           cartl_dout    and
+   --           carth_dout    and
+   --           cass_dout     and
+              openbus_data;
+
+   openbus_sel <= '1' when c16_addr(15 downto 5) = x"FD" & "111" else '0';
+   openbus_data <= c16_datalatch when openbus_sel = '1' else x"FF";
+
+   process(clk_main_i)
+   begin
+       if rising_edge(clk_main_i) then
+           c16_datalatch <= c16_din;
+       end if;
+   end process;
+
+   joy0 <= not(joy_1_fire_n_i & joy_1_up_n_i & joy_1_down_n_i & joy_1_left_n_i & joy_1_right_n_i);
+   joy1 <= not(joy_2_fire_n_i & joy_2_up_n_i & joy_2_down_n_i & joy_2_left_n_i & joy_2_right_n_i);
+
+   c16_inst : entity work.c16
+      port map (
+         clk28                  => clk_main_i,
+         reset                  => reset_soft_i or reset_hard_i,
+         wait_i                 => '0',
 
          -- VGA/SCART interface
-         o_ce_pix      => video_ce,
-         o_hsync       => vga_hs,
-         o_vsync       => vga_vs,
-         o_video_r     => vga_red,
-         o_video_g     => vga_green,
-         o_video_b     => vga_blue,
-         o_hblank      => video_hblank_o,
-         o_vblank      => video_vblank_o,
-         -- 00 = None
-         -- 01 = Horz
-         -- 10 = Vert
-         -- 11 = Both
-         i_center      => center_i,
-         i_pal         => '1',
-         i_wide        => '0',
+         ce_pix                 => video_ce,
+         hsync                  => vga_hs,
+         vsync                  => vga_vs,
+         red                    => vga_red,
+         green                  => vga_green,
+         blue                   => vga_blue,
+         hblank                 => video_hblank_o,
+         vblank                 => video_vblank_o,
+         tvmode                 => "00",
+         wide                   => "0",
 
-         -- paddle interface
-         i_joy         => joy_1_right_n_i & joy_1_left_n_i & joy_1_down_n_i & joy_1_up_n_i,
-         i_fire        => joy_1_fire_n_i,
-         i_potx        => pot1_x_i,
-         i_poty        => pot1_y_i,
+         -- memory and bus / decode logic
+         rnw                    => c16_rnw,
+         addr                   => c16_addr,
+         dout                   => c16_dout,
+         din                    => c16_din,
+         cs_ram                 => cs_ram,
+         cs0                    => cs0,
+         cs1                    => cs1,
+         cs_io                  => cs_io,
 
-         o_audio       => o_audio,
+         -- tape
+         cass_mtr               => open,
+         cass_in                => '0',
+         cass_aud               => '0',
+         cass_out               => open,
+
+         -- joystick
+         joy0                   => joy0,
+         joy1                   => joy1,
+
+         -- keyboard
+         kb_key_num_i           => kb_key_num_i,
+         kb_key_pressed_n_i     => kb_key_pressed_n_i,
+         key_play               => open,
 
          -- IEC
-         clk_i         => vic20_iec_clk_in and hw_iec_clk_n_in,
-         clk_o         => vic20_iec_clk_out,
-         atn_o         => vic20_iec_atn_out,
-         data_i        => vic20_iec_data_in and hw_iec_data_n_in,
-         data_o        => vic20_iec_data_out,
+         iec_dataout            => c16_iec_data_out,
+         iec_datain             => c16_iec_data_in and hw_iec_data_n_in,
+         iec_clkout             => c16_iec_clk_out,
+         iec_clkin              => c16_iec_clk_in and hw_iec_clk_n_in,
+         iec_atnout             => c16_iec_atn_out,
+         iec_reset              => open,
 
-         -- Cassette drive
-         cass_write    => open,
-         cass_motor    => open,
-         cass_sw       => '0',
-         cass_read     => '0',
+         -- TED audio and SID selector
+         sound                  => o_audio,
+         sid_type               => sid_type_i,
 
-         rom_std       => vic20_rom_i,
-         conf_clk      => conf_clk_i,
-         conf_wr       => conf_wr_i,
-         conf_ai       => conf_ai_i,
-         conf_di       => conf_di_i
-      ); -- vic20_inst
+         -- video mode?
+         pal                    => open
+      ); -- c16_inst
 
    --------------------------------------------------------------------------------------------------
    -- Generate video output for the M2M framework
@@ -352,10 +499,12 @@ begin
    video_green_o   <= vga_green & "0000";
    video_blue_o    <= vga_blue & "0000";
    video_ce_o      <= video_ce and not video_ce_d;
-   video_ce_ovl_o  <= -- '1' when video_retro15khz_i = '0' else
+   video_ce_ovl_o  <= '1' when video_retro15khz_i = '0' else
                       not div_ovl(0);
 
-   -- Clock divider: The core's pixel clock is 1/2 of the main clock
+   video_hs_o      <= not vga_hs;
+   video_vs_o      <= not vga_vs;
+
    video_ce_proc : process (clk_video_i)
    begin
       if rising_edge(clk_video_i) then
@@ -364,73 +513,12 @@ begin
       end if;
    end process video_ce_proc;
 
-
-   --------------------------------------------------------------------------------------------------
-   -- Keyboard- and joystick controller
-   --------------------------------------------------------------------------------------------------
-
-   -- Convert MEGA65 keystrokes to the VIC20 keyboard matrix that the CIA1 can scan
-   -- and convert the MEGA65 joystick signals to CIA1 signals as well
-   keyboard_inst : entity work.keyboard
-      port map (
-         clk_main_i      => clk_main_i,
-         reset_i         => not reset_core_n,
-
-         -- Trigger the sequence RUN<Return> to autostart PRG files
-         trigger_run_i   => trigger_run_i,
-
-         -- Interface to the MEGA65 keyboard
-         key_num_i       => kb_key_num_i,
-         key_pressed_n_i => kb_key_pressed_n_i,
-
-         -- Interface to the MEGA65 joysticks
-         joy_1_up_n_i    => joy_1_up_n_i,
-         joy_1_down_n_i  => joy_1_down_n_i,
-         joy_1_left_n_i  => joy_1_left_n_i,
-         joy_1_right_n_i => joy_1_right_n_i,
-         joy_1_fire_n_i  => joy_1_fire_n_i,
-
-         joy_1_up_n_o    => joy_1_up_n_o,
-         joy_1_down_n_o  => joy_1_down_n_o,
-         joy_1_left_n_o  => joy_1_left_n_o,
-         joy_1_right_n_o => joy_1_right_n_o,
-         joy_1_fire_n_o  => joy_1_fire_n_o,
-
-         joy_2_up_n_i    => joy_2_up_n_i,
-         joy_2_down_n_i  => joy_2_down_n_i,
-         joy_2_left_n_i  => joy_2_left_n_i,
-         joy_2_right_n_i => joy_2_right_n_i,
-         joy_2_fire_n_i  => joy_2_fire_n_i,
-
-         joy_2_up_n_o    => joy_2_up_n_o,
-         joy_2_down_n_o  => joy_2_down_n_o,
-         joy_2_left_n_o  => joy_2_left_n_o,
-         joy_2_right_n_o => joy_2_right_n_o,
-         joy_2_fire_n_o  => joy_2_fire_n_o,
-
-         -- Interface to the MiSTer VIC20 core that directly connects to the VIC20's CIA1 instead of
-         -- going the detour of converting the MEGA65 keystrokes into PS/2 keystrokes first.
-         -- This means, that the "fpga64_keyboard" entity of the original core is not used. Instead,
-         -- we are modifying the "vic20_inst" entity so that we can route the CIA1's ports
-         -- A and B into this keyboard driver which then emulates the behavior of the physical
-         -- C64 keyboard including the possibility to "scan" via the row, i.e. pull one or more bits of
-         -- port A to zero (one by one) and read via the "column" (i.e. from port B) or vice versa.
-         cia1_pai_o      => cia1_pa_in,
-         cia1_pao_i      => cia1_pa_out(0) & cia1_pa_out(6 downto 1) & cia1_pa_out(7),
-         cia1_pbi_o      => cia1_pb_in,
-         cia1_pbo_i      => cia1_pb_out(3) & cia1_pb_out(6 downto 4) & cia1_pb_out(7) & cia1_pb_out(2 downto 0),
-
-         -- Restore key = NMI
-         restore_n       => restore_key_n
-      ); -- keyboard_inst
-
    --------------------------------------------------------------------------------------------------
    -- MiSTer audio signal processing: Convert the core's 6-bit signal to a signed 16-bit signal
    --------------------------------------------------------------------------------------------------
 
-   audio_left_o    <= "0" & signed(o_audio) & "000000000";
-   audio_right_o   <= "0" & signed(o_audio) & "000000000";
-
+   audio_left_o    <= signed(o_audio);
+   audio_right_o   <= signed(o_audio);
 
    --------------------------------------------------------------------------------------------------
    -- Hardware IEC port
@@ -447,15 +535,15 @@ begin
 
       -- Since IEC is a bus, we need to connect the input lines coming from the hardware port
       -- to all participants of the bus. At this time these are:
-      --    VIC20: vic20_inst using the iec_ signals
+      --    C16: c16_inst using the iec_ signals
       --    Simulated disk drives: iec_drive_inst using the iec_ signals
       -- All signals are LOW active, so we need to AND them.
-      -- As soon as we have more participants than just vic20_inst and iec_drive_inst we will
+      -- As soon as we have more participants than just c16_inst and iec_drive_inst we will
       -- need to have some more signals for the bus instead of directly connecting them as we do today.
       hw_iec_clk_n_in  <= '1';
       hw_iec_data_n_in <= '1';
 
-      -- According to https://www.c64-wiki.com/wiki/Serial_Port, the VIC20 does not use the SRQ line and therefore
+      -- According to https://www.c64-wiki.com/wiki/Serial_Port, the C16 does not use the SRQ line and therefore
       -- we are at this time also not using it. The wiki article states, hat even though it is not used, it is
       -- still connected with the read line of the cassette port (although this can only detect signal edges,
       -- but not signal levels).
@@ -473,19 +561,19 @@ begin
          iec_clk_n_o      <= '0';
          iec_data_n_o     <= '0';
 
-         -- These lines are not connected to a NC7SZ126P5X since the VIC20 is supposed to be the only
+         -- These lines are not connected to a NC7SZ126P5X since the C16 is supposed to be the only
          -- party in the bus who is allowed to pull this line to zero
          iec_reset_n_o    <= reset_core_n;
-         iec_atn_n_o      <= vic20_iec_atn_out;
+         iec_atn_n_o      <= c16_iec_atn_out;
 
          -- Read from the hardware IEC port (see comment above: We need to connect this to i_fpga64_sid_iec and i_iec_drive)
          hw_iec_clk_n_in  <= iec_clk_n_i;
          hw_iec_data_n_in <= iec_data_n_i;
 
          -- Write to the IEC port by pulling the signals low and otherwise let them float (using the NC7SZ126P5X chip)
-         -- We need to invert the logic, because if the VIC20 wants to pull something to LOW we need to ENABLE the NC7SZ126P5X's OE
-         iec_clk_en_o     <= not vic20_iec_clk_out;
-         iec_data_en_o    <= not vic20_iec_data_out;
+         -- We need to invert the logic, because if the C16 wants to pull something to LOW we need to ENABLE the NC7SZ126P5X's OE
+         iec_clk_en_o     <= not c16_iec_clk_out;
+         iec_data_en_o    <= not c16_iec_data_out;
       end if;
    end process handle_hardware_iec_port_proc;
 
@@ -507,59 +595,59 @@ begin
       iec_drives_reset(i) <= (not reset_core_n) or (not vdrives_mounted(i));
    end generate iec_drv_reset_gen;
 
-   c1541_multi_inst : entity work.c1541_multi
-      generic map (
-         PARPORT => 0, -- Parallel C1541 port for faster (~20x) loading time using DolphinDOS
-         DUALROM => 1, -- Two switchable ROMs: Standard DOS and JiffyDOS
-         DRIVES  => G_VDNUM
-      )
-      port map (
-         clk          => clk_main_i,
-         ce           => iec_drive_ce,
-         reset        => iec_drives_reset,
-         pause        => '0',
+  c1541_multi_inst : entity work.c1541_multi
+     generic map (
+        PARPORT => 0, -- Parallel C1541 port for faster (~20x) loading time using DolphinDOS
+        DUALROM => 1, -- Two switchable ROMs: Standard DOS and JiffyDOS
+        DRIVES  => G_VDNUM
+     )
+     port map (
+        clk          => clk_main_i,
+        ce           => iec_drive_ce,
+        reset        => iec_drives_reset,
+        pause        => '0',
 
-         -- interface to the VIC20 core
-         iec_clk_i    => vic20_iec_clk_out and hw_iec_clk_n_in,
-         iec_clk_o    => vic20_iec_clk_in,
-         iec_atn_i    => vic20_iec_atn_out,
-         iec_data_i   => vic20_iec_data_out and hw_iec_data_n_in,
-         iec_data_o   => vic20_iec_data_in,
+        -- interface to the C16 core
+        iec_clk_i    => c16_iec_clk_out and hw_iec_clk_n_in,
+        iec_clk_o    => c16_iec_clk_in,
+        iec_atn_i    => c16_iec_atn_out,
+        iec_data_i   => c16_iec_data_out and hw_iec_data_n_in,
+        iec_data_o   => c16_iec_data_in,
 
-         -- disk image status
-         img_mounted  => iec_img_mounted,
-         img_readonly => iec_img_readonly,
-         img_size     => iec_img_size,
-         gcr_mode     => "00",                -- D64
+        -- disk image status
+        img_mounted  => iec_img_mounted,
+        img_readonly => iec_img_readonly,
+        img_size     => iec_img_size,
+        gcr_mode     => "00",                -- D64
 
-         -- QNICE SD-Card/FAT32 interface
-         clk_sys      => iec_clk_sd_i,
+        -- QNICE SD-Card/FAT32 interface
+        clk_sys      => iec_clk_sd_i,
 
-         sd_lba       => iec_sd_lba,
-         sd_blk_cnt   => iec_sd_blk_cnt,
-         sd_rd        => iec_sd_rd,
-         sd_wr        => iec_sd_wr,
-         sd_ack       => iec_sd_ack,
-         sd_buff_addr => iec_sd_buf_addr,
-         sd_buff_dout => iec_sd_buf_data_in,  -- data from SD card to the buffer RAM within the drive ("dout" is a strange name)
-         sd_buff_din  => iec_sd_buf_data_out, -- read the buffer RAM within the drive
-         sd_buff_wr   => iec_sd_buf_wr,
+        sd_lba       => iec_sd_lba,
+        sd_blk_cnt   => iec_sd_blk_cnt,
+        sd_rd        => iec_sd_rd,
+        sd_wr        => iec_sd_wr,
+        sd_ack       => iec_sd_ack,
+        sd_buff_addr => iec_sd_buf_addr,
+        sd_buff_dout => iec_sd_buf_data_in,  -- data from SD card to the buffer RAM within the drive ("dout" is a strange name)
+        sd_buff_din  => iec_sd_buf_data_out, -- read the buffer RAM within the drive
+        sd_buff_wr   => iec_sd_buf_wr,
 
-         -- drive led
-         led          => drive_led,
+        -- drive led
+        led          => drive_led,
 
-         -- Parallel C1541 port
-         par_stb_i    => iec_par_stb_in,
-         par_stb_o    => iec_par_stb_out,
-         par_data_i   => iec_par_data_in,
-         par_data_o   => iec_par_data_out,
+        -- Parallel C1541 port
+        par_stb_i    => iec_par_stb_in,
+        par_stb_o    => iec_par_stb_out,
+        par_data_i   => iec_par_data_in,
+        par_data_o   => iec_par_data_out,
 
-         rom_std_i    => '1',                 -- 1=use the factory default ROM
-         rom_addr_i   => (others => '0'),
-         rom_data_i   => (others => '0'),
-         rom_data_o   => open,
-         rom_wr_i     => '1'
-      ); -- c1541_multi_inst
+        rom_std_i    => '1',                 -- 1=use the factory default ROM
+        rom_addr_i   => (others => '0'),
+        rom_data_i   => (others => '0'),
+        rom_data_o   => open,
+        rom_wr_i     => '1'
+     ); -- c1541_multi_inst
 
    -- 16 MHz chip enable for the IEC drives, so that ph2_r and ph2_f can be 1 MHz (C1541's CPU runs with 1 MHz)
    -- Uses a counter to compensate for clock drift, because the input clock is not exactly at 32 MHz

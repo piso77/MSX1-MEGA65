@@ -1,7 +1,19 @@
 -------------------------------------------------------------------------------------------------------------
--- VIC 20 for MEGA65 (C64MEGA65)
+-- C16 / Plus4 for MEGA65
 --
 -- Clock Generator using the Xilinx specific MMCME2_ADV:
+--
+-- ----------------------------------------------------------------------------
+--   Output     Output      Phase    Duty Cycle   Pk-to-Pk     Phase
+--   Clock     Freq (MHz)  (degrees)    (%)     Jitter (ps)  Error (ps)
+-- ----------------------------------------------------------------------------
+--  main_clk_o__28.38010______0.000______50.0______449.167____483.122
+--  video_clk_o__56.76020______0.000______50.0______401.839____483.122
+--
+-- ----------------------------------------------------------------------------
+--  Input Clock   Freq (MHz)    Input Jitter (UI)
+-- ----------------------------------------------------------------------------
+--  __primary_________100.000____________0.010
 --
 -- MiSTer2MEGA65 done by sy2002 and MJoergen in 2022 and licensed under GPL v3
 -------------------------------------------------------------------------------------------------------------
@@ -19,9 +31,9 @@ entity clk is
    port (
       sys_clk_i       : in  std_logic;   -- expects 100 MHz
 
-      main_clk_o      : out std_logic;   -- main's 35.468944 MHz main clock
+      main_clk_o      : out std_logic;   -- main's 28.38010 Mhz MHz main clock
       main_rst_o      : out std_logic;   -- main's reset, synchronized
-      video_clk_o     : out std_logic;   -- video's 70.937888 MHz main clock
+      video_clk_o     : out std_logic;   -- video's 56.76020 MHz main clock
       video_rst_o     : out std_logic    -- video's reset, synchronized
    );
 end entity clk;
@@ -53,15 +65,15 @@ begin
          STARTUP_WAIT         => FALSE,
          CLKIN1_PERIOD        => 10.0,       -- INPUT @ 100 MHz
          REF_JITTER1          => 0.010,
-         DIVCLK_DIVIDE        => 5,
-         CLKFBOUT_MULT_F      => 47.875,     -- 957.5 MHz
+         DIVCLK_DIVIDE        => 7,
+         CLKFBOUT_MULT_F      => 55.625,     -- 794.642 MHz
          CLKFBOUT_PHASE       => 0.000,
          CLKFBOUT_USE_FINE_PS => FALSE,
-         CLKOUT0_DIVIDE_F     => 13.500,     -- 70.926 MHz
+         CLKOUT0_DIVIDE_F     => 14.000,     -- 56.76020 Mhz
          CLKOUT0_PHASE        => 0.000,
          CLKOUT0_DUTY_CYCLE   => 0.500,
          CLKOUT0_USE_FINE_PS  => FALSE,
-         CLKOUT1_DIVIDE       => 27,         -- 35.463 MHz
+         CLKOUT1_DIVIDE       => 28,         -- 28.38010 Mhz
          CLKOUT1_PHASE        => 0.000,
          CLKOUT1_DUTY_CYCLE   => 0.500,
          CLKOUT1_USE_FINE_PS  => FALSE

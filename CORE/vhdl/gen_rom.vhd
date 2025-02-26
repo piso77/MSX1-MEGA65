@@ -39,7 +39,7 @@ begin
          ADDR_WIDTH   => ADDR_WIDTH,
          DATA_WIDTH   => 8,
          ROM_PRELOAD  => true,
-         ROM_FILE     => "../../CORE/VIC20_MiSTer/" & INIT_FILE & ".hex",
+         ROM_FILE     => INIT_FILE,
          ROM_FILE_HEX => true
       )
       port map (
