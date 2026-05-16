@@ -1,3 +1,6 @@
 [submodule "QNICE"]
 	path = M2M/QNICE
 	url = https://github.com/sy2002/QNICE-FPGA
+[submodule "CORE/MSX1_MiSTer"]
+	path = CORE/MSX1_MiSTer
+	url = https://github.com/piso77/MSX1_MiSTer.git
