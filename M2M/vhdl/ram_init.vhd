@@ -15,7 +15,7 @@ entity ram_init is
    );
    port (
       clock_i   : in  std_logic;
-      clen_i    : in  std_logic;
+      clen_i    : in  std_logic := '1';
       address_i : in  std_logic_vector(G_ADDR_WIDTH-1 downto 0);
       data_i    : in  std_logic_vector(G_DATA_WIDTH-1 downto 0);
       wren_i    : in  std_logic;
