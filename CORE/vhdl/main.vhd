@@ -141,7 +141,8 @@ architecture synthesis of main is
 
    signal   reset_core_n : std_logic   := '1';
    signal   hard_reset_n : std_logic   := '1';
-   signal   cache_dirty  : std_logic   := '0';
+   signal   cache_dirty  : std_logic_vector(G_VDNUM - 1 downto 0);
+   signal   prevent_reset    : std_logic;
 
    constant C_HARD_RST_DELAY : natural := 100_000; -- roundabout 1/30 of a second
    signal   hard_rst_counter : natural := 0;
