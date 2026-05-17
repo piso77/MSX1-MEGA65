@@ -443,9 +443,6 @@ begin
          -- Audio output (PCM format, signed values)
          audio_left_o           => main_audio_left_o,
          audio_right_o          => main_audio_right_o,
-         sid_type_i             => main_sid_type,
-
-         model_i                => main_model,
 
          -- C16 drive led
          drive_led_o            => main_drive_led_o,
