@@ -8,7 +8,7 @@ library std;
 entity ram_init is
    generic (
       G_ADDR_WIDTH   : positive;
-      G_DATA_WIDTH   : positive;
+      G_DATA_WIDTH   : positive := 8;
       G_ROM_PRELOAD  : boolean := false;
       G_ROM_FILE     : string  := "";
       G_ROM_FILE_HEX : boolean := false
