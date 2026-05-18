@@ -245,7 +245,7 @@ begin
          rom_enabled            => (others => '0'),
 
          -- tape
-         cas_mtr                => open,
+         cas_motor              => open,
          cas_audio_in           => '0',
 
          slot_A                 => (others => '0'),
@@ -258,7 +258,7 @@ begin
          sdram_addr             => open,
          sdram_we               => open,
          sdram_rd               => open,
-         sdram_read             => '0',
+         sdram_ready            => '0',
          sdram_size             => (others => '0'),
 
          img_mounted            => '0',
@@ -272,7 +272,7 @@ begin
          sd_buff_dout           => (others => '0'),
          sd_buff_din            => open,
          sd_buff_wr             => '0',
-         sd_buff_strobe         => '0'
+         sd_din_strobe          => '0'
 
          -- memory and bus / decode logic
 --         rnw                    => c16_rnw,
