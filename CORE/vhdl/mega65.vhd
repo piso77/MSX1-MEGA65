@@ -226,10 +226,13 @@ architecture synthesis of mega65_core is
    -- Clocks and active high reset signals for each clock domain
    ---------------------------------------------------------------------------------------------
 
-   signal   main_clk  : std_logic;                                       -- Core main clock
-   signal   main_rst  : std_logic;
-   signal   video_clk : std_logic;                                       -- Core video clock
-   signal   video_rst : std_logic;
+   signal   sys_clk  : std_logic;
+   signal   sys_rst  : std_logic;
+   signal   sdram_clk : std_logic;
+   signal   sdram_rst : std_logic;
+
+   signal   ce_10m7 : std_logic := '0';                               -- Core main clock
+   signal   ce_5m3  : std_logic := '0';                               -- Core video clock
 
    ---------------------------------------------------------------------------------------------
    -- main_clk (MiSTer core's clock)
@@ -301,16 +304,26 @@ begin
    clk_inst : entity work.clk
       port map (
          sys_clk_i   => clk_i,
-         video_clk_o => video_clk,
-         video_rst_o => video_rst,
-         main_clk_o  => main_clk,
-         main_rst_o  => main_rst
+         sdram_clk_o => sdram_clk,
+         sdram_rst_o => sdram_rst,
+         sys_clk_o  => sys_clk,
+         sys_rst_o  => sys_rst
       ); -- clk_inst
 
-   main_clk_o           <= main_clk;
-   main_rst_o           <= main_rst;
-   video_clk_o          <= video_clk;
-   video_rst_o          <= video_rst;
+   process(sys_clk)
+       variable div : unsigned(2 downto 0) := (others => '0');
+   begin
+       if rising_edge(sys_clk) then
+           div    := div + 1;
+           ce_10m7 <= '1' when div(1 downto 0) = "00" else '0';
+           ce_5m3  <= '1' when div(2 downto 0) = "000" else '0';
+       end if;
+   end process;
+
+   main_clk_o           <= sys_clk;
+   main_rst_o           <= sys_rst;
+   video_clk_o          <= sys_clk;
+   video_rst_o          <= sys_rst;
 
    ---------------------------------------------------------------------------------------------
    -- hr_clk (HyperRAM clock)
@@ -376,8 +389,9 @@ begin
          G_VDNUM => C_VDNUM
       )
       port map (
-         clk_main_i             => main_clk,
-         clk_video_i            => video_clk,
+         clk_main_i             => sys_clk,
+         ce_10m7_i              => ce_10m7,
+         ce_5m3_i               => ce_5m3,
 
          -- see RESET SEMANTICS in main.vhd
          -- reset_soft_i minimum pulse length is 32 clock cycles

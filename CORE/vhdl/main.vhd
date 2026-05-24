@@ -18,7 +18,8 @@ entity main is
    );
    port (
       clk_main_i             : in    std_logic;
-      clk_video_i            : in    std_logic;
+      ce_10m7_i              : in    std_logic;
+      ce_5m3_i               : in    std_logic;
 
       -- A pulse of reset_soft_i needs to be 32 clock cycles long at a minimum
       reset_soft_i           : in    std_logic;
@@ -211,11 +212,10 @@ begin
    MSX1 : entity work.msx1
       port map (
          clk                    => clk_main_i,
-         ce_10m7                => '0',
+         ce_10m7                => ce_10m7_i,
          reset                  => reset_soft_i or reset_hard_i,
 
          -- VGA/SCART interface
-         --ce_pix                 => video_ce,
          border                 => '0',
          R                      => video_red_o,
          G                      => video_green_o,
@@ -310,6 +310,7 @@ begin
    -- Generate video output for the M2M framework
    --------------------------------------------------------------------------------------------------
 
+   video_ce        <= ce_5m3_i;
    video_ce_o      <= video_ce and not video_ce_d;
    video_ce_ovl_o  <= '1' when video_retro15khz_i = '0' else
                       not div_ovl(0);
@@ -317,9 +318,9 @@ begin
    video_hs_o      <= not vga_hs;
    video_vs_o      <= not vga_vs;
 
-   video_ce_proc : process (clk_video_i)
+   video_ce_proc : process (clk_main_i)
    begin
-      if rising_edge(clk_video_i) then
+      if rising_edge(clk_main_i) then
          video_ce_d <= video_ce;
          div_ovl    <= div_ovl + 1;
       end if;
