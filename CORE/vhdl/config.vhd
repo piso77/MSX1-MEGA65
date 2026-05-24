@@ -207,8 +207,8 @@ constant SEL_CFG_FILE      : std_logic_vector(15 downto 0) := x"0101";
 
 -- START YOUR CONFIGURATION BELOW THIS LINE
 
-constant DIR_START         : string := "/c16";
-constant CFG_FILE          : string := "/c16/c16mega65";
+constant DIR_START         : string := "/msx1";
+constant CFG_FILE          : string := "/msx1/msx1mega65";
 
 --------------------------------------------------------------------------------------------------------------------
 -- General configuration settings: Reset, Pause, OSD behavior, Ascal, etc. (Selector 0x0110)
