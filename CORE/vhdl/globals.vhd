@@ -4,7 +4,7 @@
 -- Global Constants
 --
 -- based on VIC20MEGA65 by MJoergen and sy2002 in 2023
--- based on C16_MiSTer by the MiSTer development team
+-- based on MSX1_MiSTer by the MiSTer development team
 -- port done by Paolo Pisati <p.pisati@gmail.com> in 2026 and licensed under GPL v3
 ----------------------------------------------------------------------------------
 
@@ -43,7 +43,7 @@ constant QNICE_FIRMWARE           : string  := QNICE_FIRMWARE_M2M;
 ----------------------------------------------------------------------------------------------------------
 
 -- C16 core clock speed
-constant CORE_CLK_SPEED       : natural := 28_380_100;   -- C16 core expects 28.38010MHz
+constant CORE_CLK_SPEED       : natural := 42_954_550;   -- MSX1 core expects 42.95455MHz
 
 -- System clock speed (crystal that is driving the FPGA) and QNICE clock speed
 -- !!! Do not touch !!!
