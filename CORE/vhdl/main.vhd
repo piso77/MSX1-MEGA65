@@ -315,8 +315,15 @@ begin
    video_ce_ovl_o  <= '1' when video_retro15khz_i = '0' else
                       not div_ovl(0);
 
-   video_hs_o      <= not vga_hs;
-   video_vs_o      <= not vga_vs;
+   process(clk_main_i)
+   begin
+      if rising_edge(clk_main_i) then
+         if video_hs_o = '0' and vga_hs = '0' then
+            video_vs_o <= not vga_vs;
+         end if;
+         video_hs_o <= not vga_hs;
+      end if;
+   end process;
 
    video_ce_proc : process (clk_main_i)
    begin
