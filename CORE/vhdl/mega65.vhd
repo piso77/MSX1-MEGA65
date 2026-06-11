@@ -374,6 +374,7 @@ begin
    -- We switch it to blue when a long reset is detected and as long as the user keeps pressing the preset button
    main_power_led_o     <= '1';
    main_power_led_col_o <= x"0000FF" when main_reset_m2m_i else
+                           x"FF0000" when (main_reset_core_i or main_reset_from_prgloader) else
                            x"00FF00";
 
    main_sid_type <= "01" when main_osm_control_i(C_MENU_SID_6581) else
