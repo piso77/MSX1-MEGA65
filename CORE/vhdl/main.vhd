@@ -216,7 +216,7 @@ begin
          reset                  => reset_soft_i or reset_hard_i,
 
          -- VGA/SCART interface
-         border                 => '0',
+         border                 => '1',
          R                      => video_red_o,
          G                      => video_green_o,
          B                      => video_blue_o,
