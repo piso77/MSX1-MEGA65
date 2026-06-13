@@ -224,7 +224,7 @@ begin
          vsync_n                => vga_vs,
          hblank                 => video_hblank_o,
          vblank                 => video_vblank_o,
-         vdp_pal                => '1',
+         vdp_pal                => '0',
 
          audio                  => o_audio,
 
