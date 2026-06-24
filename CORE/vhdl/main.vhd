@@ -228,7 +228,8 @@ begin
 
          audio                  => o_audio,
 
-         ps2_key                => (others => '0'),
+         kb_scancode            => to_stdlogicvector(kb_key_num_i),
+         kb_release             => kb_key_pressed_n_i,
          joy0                   => joy0,
          joy1                   => joy1,
 
