@@ -228,7 +228,7 @@ begin
 
          audio                  => o_audio,
 
-         kb_scancode            => to_stdlogicvector(kb_key_num_i),
+         kb_scancode            => std_logic_vector(to_unsigned(kb_key_num_i, 7)),
          kb_release             => kb_key_pressed_n_i,
          joy0                   => joy0,
          joy1                   => joy1,
