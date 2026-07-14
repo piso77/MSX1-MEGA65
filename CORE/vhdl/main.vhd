@@ -260,7 +260,6 @@ begin
          sdram_we               => open,
          sdram_rd               => open,
          sdram_ready            => '0',
-         sdram_size             => (others => '0'),
 
          img_mounted            => '0',
          img_size               => (others => '0'),
