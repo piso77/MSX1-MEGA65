@@ -150,6 +150,13 @@ architecture synthesis of main is
 
    signal joy0, joy1 : std_logic_vector(5 downto 0);
 
+   -- MSX1 ROM cart space
+   signal sdram_addr : std_logic_vector(24 downto 0);
+   signal cart_addr : std_logic_vector(18 downto 0);
+   signal cart_dout : std_logic_vector(7 downto 0);
+   signal cart_din : std_logic_vector(7 downto 0);
+   signal cart_we : std_logic;
+   signal cart_cs : std_logic;
 begin
 
    -- prevent data corruption by not allowing a soft reset to happen while the cache is still dirty
@@ -209,6 +216,24 @@ begin
    joy0 <= not(joy_1_fire_n_i & joy_1_up_n_i & joy_1_down_n_i & joy_1_left_n_i & joy_1_right_n_i & '0');
    joy1 <= not(joy_2_fire_n_i & joy_2_up_n_i & joy_2_down_n_i & joy_2_left_n_i & joy_2_right_n_i & '0');
 
+   -- split cart space in two 256Kb halves:
+   -- bit 18 = the slot-select bit (addr[22], the 3'b001 vs 3'b000 from the slots.sv mux),
+   -- bits 17:0 = the 256 KB offset within the slot.
+   cart_addr <= sdram_addr(22) & sdram_addr(17 downto 0);
+
+   cart : entity work.dualport_2clk_ram
+      generic map (
+         ADDR_WIDTH        => 19,
+         DATA_WIDTH        => 8
+      ) port map (
+         clock_a           => clk_main_i,
+         address_a         => cart_addr,
+         data_a            => cart_din,
+         q_a               => cart_dout,
+         wren_a            => cart_we,
+         cs_a              => cart_cs
+      );
+
    MSX1 : entity work.msx1
       port map (
          clk                    => clk_main_i,
@@ -254,12 +279,12 @@ begin
          mapper_info            => open,
 
          -- SDRAM
-         sdram_dout             => (others => '0'),
-         sdram_din              => open,
-         sdram_addr             => open,
-         sdram_we               => open,
-         sdram_rd               => open,
-         sdram_ready            => '0',
+         sdram_dout             => cart_dout,
+         sdram_din              => cart_din,
+         sdram_addr             => sdram_addr,
+         sdram_we               => cart_we,
+         sdram_rd               => cart_cs,
+         sdram_ready            => '1',
 
          img_mounted            => '0',
          img_size               => (others => '0'),
