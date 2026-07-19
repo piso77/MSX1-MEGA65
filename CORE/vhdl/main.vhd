@@ -226,8 +226,8 @@ begin
    -- MiSTer C16 core / main machine
    --------------------------------------------------------------------------------------------------
 
-   joy0 <= not(joy_1_fire_n_i & joy_1_up_n_i & joy_1_down_n_i & joy_1_left_n_i & joy_1_right_n_i & '0');
-   joy1 <= not(joy_2_fire_n_i & joy_2_up_n_i & joy_2_down_n_i & joy_2_left_n_i & joy_2_right_n_i & '0');
+   joy0 <= not('1' & joy_1_fire_n_i & joy_1_up_n_i & joy_1_down_n_i & joy_1_left_n_i & joy_1_right_n_i);
+   joy1 <= not('1' & joy_2_fire_n_i & joy_2_up_n_i & joy_2_down_n_i & joy_2_left_n_i & joy_2_right_n_i);
 
    -- split cart space in two 256Kb halves:
    -- bit 18 = the slot-select bit (addr[22], the 3'b001 vs 3'b000 from the slots.sv mux),
