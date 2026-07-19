@@ -238,8 +238,21 @@ architecture synthesis of mega65_core is
    -- main_clk (MiSTer core's clock)
    ---------------------------------------------------------------------------------------------
 
-   signal   main_reset_from_prgloader : std_logic;
-   signal   main_prg_trigger_run      : std_logic;
+   signal   main_roma_isrom   : std_logic;
+   signal   main_roma_wr      : std_logic;
+   signal   main_roma_addr    : std_logic_vector(24 downto 0);
+   signal   main_roma_data    : std_logic_vector(7 downto 0);
+   signal   main_roma_reset   : std_logic;
+   signal   main_roma_enabled : std_logic;
+
+   signal   main_romb_isrom   : std_logic;
+   signal   main_romb_wr      : std_logic;
+   signal   main_romb_addr    : std_logic_vector(24 downto 0);
+   signal   main_romb_data    : std_logic_vector(7 downto 0);
+   signal   main_romb_reset   : std_logic;
+   signal   main_romb_enabled : std_logic;
+
+   signal   main_ioctl_wait   : std_logic;
 
    ---------------------------------------------------------------------------------------------
    -- qnice_clk
@@ -262,11 +275,7 @@ architecture synthesis of mega65_core is
    constant C_MENU_VGA_STD       : natural := 31;
    constant C_MENU_VGA_15KHZHSVS : natural := 35;
    constant C_MENU_VGA_15KHZCS   : natural := 36;
-   subtype  c_menu_osm_scaling is natural range 65 downto 57;
-
-   signal   qnice_conf_wr : std_logic;
-   signal   qnice_conf_ai : std_logic_vector(15 downto 0);
-   signal   qnice_conf_di : std_logic_vector(7 downto 0);
+   subtype  c_menu_osm_scaling is natural range 50 downto 42;
 
    -- QNICE signals passed down to main.vhd to handle IEC drives using vdrives.vhd
    signal   qnice_iec_qnice_ce   : std_logic;
@@ -276,17 +285,16 @@ architecture synthesis of mega65_core is
    signal   qnice_iec_mount_buf_ram_we   : std_logic;
    signal   qnice_iec_mount_buf_ram_data : std_logic_vector(7 downto 0); -- Disk mount buffer
 
-   -- QNICE signals for the PRG loader
-   signal   qnice_prg_qnice_ce         : std_logic;
-   signal   qnice_prg_qnice_we         : std_logic;
-   signal   qnice_prg_qnice_data       : std_logic_vector(15 downto 0);
-   signal   qnice_prg_wait             : std_logic;
-   signal   qnice_prg_ram_we           : std_logic;
-   signal   qnice_prg_ram_addr         : std_logic_vector(15 downto 0);
-   signal   qnice_prg_ram_d_to         : std_logic_vector(7 downto 0);
-   signal   qnice_reset_for_prgloader  : std_logic;
-   signal   qnice_reset_from_prgloader : std_logic;
-   signal   qnice_prg_trigger_run      : std_logic;
+   -- QNICE signals for the two cartridge slot ROM loaders (crtrom_loader.vhd)
+   signal   qnice_roma_ce   : std_logic;
+   signal   qnice_roma_we   : std_logic;
+   signal   qnice_roma_data : std_logic_vector(15 downto 0);
+   signal   qnice_roma_wait : std_logic;
+
+   signal   qnice_romb_ce   : std_logic;
+   signal   qnice_romb_we   : std_logic;
+   signal   qnice_romb_data : std_logic_vector(15 downto 0);
+   signal   qnice_romb_wait : std_logic;
 
 begin
 
@@ -364,7 +372,7 @@ begin
    -- We switch it to blue when a long reset is detected and as long as the user keeps pressing the preset button
    main_power_led_o     <= '1';
    main_power_led_col_o <= x"0000FF" when main_reset_m2m_i else
-                           x"FF0000" when (main_reset_core_i or main_reset_from_prgloader) else
+                           x"FF0000" when (main_reset_core_i or main_roma_reset or main_romb_reset) else
                            x"00FF00";
 
    -- main.vhd contains the actual MiSTer core
@@ -380,10 +388,9 @@ begin
          -- see RESET SEMANTICS in main.vhd
          -- reset_soft_i minimum pulse length is 32 clock cycles
          reset_soft_i           => main_reset_core_i,
-         reset_hard_i           => main_reset_m2m_i or main_reset_from_prgloader,
+         reset_hard_i           => main_reset_m2m_i,
 
          pause_i                => main_pause_core_i,
-         trigger_run_i          => main_prg_trigger_run,
 
          ---------------------------
          -- Configuration options
@@ -446,11 +453,20 @@ begin
          drive_led_o            => main_drive_led_o,
          drive_led_col_o        => main_drive_led_col_o,
 
-         -- VIC 20 RAM
-         conf_clk_i             => qnice_clk_i,
-         conf_wr_i              => qnice_conf_wr,
-         conf_ai_i              => qnice_conf_ai,
-         conf_di_i              => qnice_conf_di,
+         -- Cartridge slot ROM loading (core clock domain, from the crtrom_loader instances)
+         roma_isrom_i           => main_roma_isrom,
+         roma_wr_i              => main_roma_wr,
+         roma_addr_i            => main_roma_addr,
+         roma_data_i            => main_roma_data,
+         roma_reset_i           => main_roma_reset,
+         roma_enabled_i         => main_roma_enabled,
+         romb_isrom_i           => main_romb_isrom,
+         romb_wr_i              => main_romb_wr,
+         romb_addr_i            => main_romb_addr,
+         romb_data_i            => main_romb_data,
+         romb_reset_i           => main_romb_reset,
+         romb_enabled_i         => main_romb_enabled,
+         ioctl_wait_o           => main_ioctl_wait,
 
          -- IEC handled by QNICE
          iec_clk_sd_i           => qnice_clk_i, -- "sd card write clock" for floppy drive internal dual clock RAM buffer
@@ -537,22 +553,15 @@ begin
       -- Avoid latches
       qnice_dev_data_o           <= x"EEEE";
       qnice_dev_wait_o           <= '0';
-      qnice_conf_ai              <= (others => '0');
-      qnice_conf_wr              <= '0';
-      qnice_conf_di              <= (others => '0');
       qnice_iec_qnice_ce         <= '0';
       qnice_iec_qnice_we         <= '0';
       qnice_iec_mount_buf_ram_we <= '0';
-      qnice_prg_qnice_ce         <= '0';
-      qnice_prg_qnice_we         <= '0';
+      qnice_roma_ce              <= '0';
+      qnice_roma_we              <= '0';
+      qnice_romb_ce              <= '0';
+      qnice_romb_we              <= '0';
 
       case qnice_dev_id_i is
-
-         -- C16 RAM
-         when C_DEV_C16_RAM =>
-            qnice_conf_ai <= qnice_dev_addr_i(15 downto 0);
-            qnice_conf_wr <= qnice_dev_we_i;
-            qnice_conf_di <= qnice_dev_data_i(7 downto 0);
 
          -- IEC drives
          when C_DEV_IEC_VDRIVES =>
@@ -565,17 +574,19 @@ begin
             qnice_iec_mount_buf_ram_we <= qnice_dev_we_i;
             qnice_dev_data_o           <= x"00" & qnice_iec_mount_buf_ram_data;
 
-         -- Cartridge slot ROM loader
-         -- @TODO: interim: still served by prg_loader (always RESP_READY) so the OSD load
-         -- flow works end-to-end; replaced by two crtrom_loader instances in the next commit
+         -- Cartridge Slot A ROM loader
          when C_DEV_MSX_ROMA =>
-            qnice_conf_ai      <= qnice_prg_ram_addr;
-            qnice_conf_wr      <= qnice_prg_ram_we;
-            qnice_conf_di      <= qnice_prg_ram_d_to;
-            qnice_prg_qnice_ce <= qnice_dev_ce_i;
-            qnice_prg_qnice_we <= qnice_dev_we_i;
-            qnice_dev_data_o   <= qnice_prg_qnice_data;
-            qnice_dev_wait_o   <= qnice_prg_wait;
+            qnice_roma_ce    <= qnice_dev_ce_i;
+            qnice_roma_we    <= qnice_dev_we_i;
+            qnice_dev_data_o <= qnice_roma_data;
+            qnice_dev_wait_o <= qnice_roma_wait;
+
+         -- Cartridge Slot B ROM loader
+         when C_DEV_MSX_ROMB =>
+            qnice_romb_ce    <= qnice_dev_ce_i;
+            qnice_romb_we    <= qnice_dev_we_i;
+            qnice_dev_data_o <= qnice_romb_data;
+            qnice_dev_wait_o <= qnice_romb_wait;
 
          when others =>
             null;
@@ -604,57 +615,56 @@ begin
          q_a       => qnice_iec_mount_buf_ram_data
       ); -- mount_buf_ram_inst
 
-   -- PRG file loader
-   prg_loader_inst : entity work.prg_loader
-      port map (
-         qnice_clk_i       => qnice_clk_i,
-         qnice_rst_i       => qnice_rst_i or qnice_reset_for_prgloader,
-         qnice_addr_i      => qnice_dev_addr_i,
-         qnice_data_i      => qnice_dev_data_i,
-         qnice_ce_i        => qnice_prg_qnice_ce,
-         qnice_we_i        => qnice_prg_qnice_we,
-         qnice_data_o      => qnice_prg_qnice_data,
-         qnice_wait_o      => qnice_prg_wait,
-
-         ram_we_o          => qnice_prg_ram_we,
-         ram_addr_o        => qnice_prg_ram_addr,
-         ram_data_i        => (others => '0'),
-         ram_data_o        => qnice_prg_ram_d_to,
-
-         core_reset_o      => qnice_reset_from_prgloader,
-         core_triggerrun_o => qnice_prg_trigger_run
-      ); -- prg_loader_inst
-
-   ---------------------------------------------------------------------------------------------
-   -- Dual Clocks
-   ---------------------------------------------------------------------------------------------
-
-   -- Clock Domain Crossing: CORE -> QNICE
-   cdc_main2qnice_inst : component xpm_cdc_array_single
+   -- Cartridge slot ROM loaders: dual-domain modules, no external CDC needed
+   crtrom_loader_a_inst : entity work.crtrom_loader
       generic map (
-         WIDTH => 1
+         G_ROM_MAX => 256 * 1024
       )
       port map (
-         src_clk     => main_clk_o,
-         src_in(0)   => main_reset_core_i,
-         dest_clk    => qnice_clk_i,
-         dest_out(0) => qnice_reset_for_prgloader
-      ); -- cdc_main2qnice_inst
+         qnice_clk_i        => qnice_clk_i,
+         qnice_rst_i        => qnice_rst_i,
+         qnice_addr_i       => qnice_dev_addr_i,
+         qnice_data_i       => qnice_dev_data_i,
+         qnice_ce_i         => qnice_roma_ce,
+         qnice_we_i         => qnice_roma_we,
+         qnice_data_o       => qnice_roma_data,
+         qnice_wait_o       => qnice_roma_wait,
 
+         main_clk_i         => sys_clk,
+         main_rst_i         => main_reset_m2m_i,   -- hard reset only: rom_enabled survives soft resets
+         main_ioctl_isrom_o => main_roma_isrom,
+         main_ioctl_wr_o    => main_roma_wr,
+         main_ioctl_addr_o  => main_roma_addr,
+         main_ioctl_data_o  => main_roma_data,
+         main_ioctl_wait_i  => main_ioctl_wait,
+         main_core_reset_o  => main_roma_reset,
+         main_rom_enabled_o => main_roma_enabled
+      ); -- crtrom_loader_a_inst
 
-   -- Clock Domain Crossing: QNICE -> CORE
-   cdc_qnice2main_inst : component xpm_cdc_array_single
+   crtrom_loader_b_inst : entity work.crtrom_loader
       generic map (
-         WIDTH => 2
+         G_ROM_MAX => 256 * 1024
       )
       port map (
-         src_clk     => qnice_clk_i,
-         src_in(0)   => qnice_reset_from_prgloader,
-         src_in(1)   => qnice_prg_trigger_run,
-         dest_clk    => main_clk_o,
-         dest_out(0) => main_reset_from_prgloader,
-         dest_out(1) => main_prg_trigger_run
-      ); -- cdc_qnice2main_inst
+         qnice_clk_i        => qnice_clk_i,
+         qnice_rst_i        => qnice_rst_i,
+         qnice_addr_i       => qnice_dev_addr_i,
+         qnice_data_i       => qnice_dev_data_i,
+         qnice_ce_i         => qnice_romb_ce,
+         qnice_we_i         => qnice_romb_we,
+         qnice_data_o       => qnice_romb_data,
+         qnice_wait_o       => qnice_romb_wait,
+
+         main_clk_i         => sys_clk,
+         main_rst_i         => main_reset_m2m_i,   -- hard reset only: rom_enabled survives soft resets
+         main_ioctl_isrom_o => main_romb_isrom,
+         main_ioctl_wr_o    => main_romb_wr,
+         main_ioctl_addr_o  => main_romb_addr,
+         main_ioctl_data_o  => main_romb_data,
+         main_ioctl_wait_i  => main_ioctl_wait,
+         main_core_reset_o  => main_romb_reset,
+         main_rom_enabled_o => main_romb_enabled
+      ); -- crtrom_loader_b_inst
 
 end architecture synthesis;
 

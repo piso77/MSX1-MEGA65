@@ -28,9 +28,6 @@ entity main is
       -- Pull high to pause the core
       pause_i                : in    std_logic;
 
-      -- Trigger the sequence RUN<Return> to autostart PRG files
-      trigger_run_i          : in    std_logic;
-
       ---------------------------
       -- Configuration options
       ---------------------------
@@ -93,11 +90,21 @@ entity main is
       drive_led_o            : out   std_logic;
       drive_led_col_o        : out   std_logic_vector(23 downto 0);
 
-      -- Access to main memory
-      conf_clk_i             : in    std_logic;
-      conf_ai_i              : in    std_logic_vector(15 downto 0);
-      conf_di_i              : in    std_logic_vector(7 downto 0);
-      conf_wr_i              : in    std_logic;
+      -- Cartridge slot ROM loading (core clock domain, from the crtrom_loader
+      -- instances in mega65.vhd); replayed as a MiSTer ioctl stream below
+      roma_isrom_i           : in    std_logic;
+      roma_wr_i              : in    std_logic;
+      roma_addr_i            : in    std_logic_vector(24 downto 0);
+      roma_data_i            : in    std_logic_vector(7 downto 0);
+      roma_reset_i           : in    std_logic;
+      roma_enabled_i         : in    std_logic;
+      romb_isrom_i           : in    std_logic;
+      romb_wr_i              : in    std_logic;
+      romb_addr_i            : in    std_logic_vector(24 downto 0);
+      romb_data_i            : in    std_logic_vector(7 downto 0);
+      romb_reset_i           : in    std_logic;
+      romb_enabled_i         : in    std_logic;
+      ioctl_wait_o           : out   std_logic;
 
       -- IEC handled by QNICE
       iec_clk_sd_i           : in    std_logic;             -- QNICE "sd card write clock" for floppy drive internal dual clock RAM buffer
@@ -157,6 +164,12 @@ architecture synthesis of main is
    signal cart_din : std_logic_vector(7 downto 0);
    signal cart_we : std_logic;
    signal cart_cs : std_logic;
+
+   -- shared MiSTer ioctl bus: only one slot loads at a time (the Shell is
+   -- single-threaded), so a mux by the active isrom level is sufficient
+   signal ioctl_wr   : std_logic;
+   signal ioctl_addr : std_logic_vector(24 downto 0);
+   signal ioctl_dout : std_logic_vector(7 downto 0);
 begin
 
    -- prevent data corruption by not allowing a soft reset to happen while the cache is still dirty
@@ -221,6 +234,11 @@ begin
    -- bits 17:0 = the 256 KB offset within the slot.
    cart_addr <= sdram_addr(22) & sdram_addr(17 downto 0);
 
+   -- shared ioctl download bus, muxed by the active loader
+   ioctl_wr   <= roma_wr_i or romb_wr_i;
+   ioctl_addr <= roma_addr_i when roma_isrom_i = '1' else romb_addr_i;
+   ioctl_dout <= roma_data_i when roma_isrom_i = '1' else romb_data_i;
+
    cart : entity work.dualport_2clk_ram
       generic map (
          ADDR_WIDTH        => 19,
@@ -238,7 +256,9 @@ begin
       port map (
          clk                    => clk_main_i,
          ce_10m7                => ce_10m7_i,
-         reset                  => reset_soft_i or reset_hard_i,
+         -- MSX1.sv upstream holds reset for the whole download:
+         --    reset = RESET | ... | ioctl_isROMA | ioctl_isROMB | ...
+         reset                  => reset_soft_i or reset_hard_i or roma_reset_i or romb_reset_i,
 
          -- VGA/SCART interface
          border                 => '1',
@@ -258,17 +278,17 @@ begin
          joy0                   => joy0,
          joy1                   => joy1,
 
-         ioctl_download         => '0',
+         ioctl_download         => roma_isrom_i or romb_isrom_i,
          ioctl_index            => (others => '0'),
-         ioctl_wr               => (others => '0'),
-         ioctl_addr             => (others => '0'),
-         ioctl_dout             => (others => '0'),
-         ioctl_isROMA           => '0',
-         ioctl_isROMB           => '0',
+         ioctl_wr               => ioctl_wr,
+         ioctl_addr             => ioctl_addr,
+         ioctl_dout             => ioctl_dout,
+         ioctl_isROMA           => roma_isrom_i,
+         ioctl_isROMB           => romb_isrom_i,
          ioctl_isBIOS           => '0',
          ioctl_isFWBIOS         => '0',
-         ioctl_wait             => open,
-         rom_enabled            => (others => '0'),
+         ioctl_wait             => ioctl_wait_o,
+         rom_enabled            => romb_enabled_i & roma_enabled_i,
 
          -- tape
          cas_motor              => open,
