@@ -185,6 +185,11 @@ begin
          -- registered before CDC so the multi-bit status compare cannot glitch
          if qnice_req_status = C_CSR_REQ_LDNG then
             stream_active <= '1';
+            -- new download: clear a stale size error from a previous too-large
+            -- load; the Shell never returns the CSR status to IDLE after boot
+            if stream_active = '0' then
+               size_err <= '0';
+            end if;
          else
             stream_active <= '0';
          end if;
