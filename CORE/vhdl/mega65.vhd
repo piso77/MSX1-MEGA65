@@ -246,37 +246,27 @@ architecture synthesis of mega65_core is
    ---------------------------------------------------------------------------------------------
 
    -- OSM selections within qnice_osm_control_i
-   constant C_MENU_MODEL_C16     : natural := 10;
-   constant C_MENU_MODEL_PLUS4   : natural := 11;
-   constant C_MENU_SID_NONE      : natural := 17;
-   constant C_MENU_SID_6581      : natural := 18;
-   constant C_MENU_SID_8580      : natural := 19;
-   constant C_MENU_FLIP_JOYS     : natural := 22;
-   constant C_MENU_IMPROVE_AUDIO : natural := 23;
-   constant C_MENU_IEC           : natural := 24;
-   constant C_MENU_HDMI_16_9_50  : natural := 31;
-   constant C_MENU_HDMI_16_9_60  : natural := 32;
-   constant C_MENU_HDMI_4_3_50   : natural := 33;
-   constant C_MENU_HDMI_5_4_50   : natural := 34;
-   constant C_MENU_HDMI_640_60   : natural := 35;
-   constant C_MENU_HDMI_720_5994 : natural := 36;
-   constant C_MENU_HDMI_800_60   : natural := 37;
-   constant C_MENU_HDMI_FF       : natural := 39;
-   constant C_MENU_HDMI_DVI      : natural := 40;
-   constant C_MENU_CRT_EMULATION : natural := 43;
-   constant C_MENU_HDMI_ZOOM     : natural := 44;
-   constant C_MENU_VGA_STD       : natural := 48;
-   constant C_MENU_VGA_15KHZHSVS : natural := 52;
-   constant C_MENU_VGA_15KHZCS   : natural := 53;
+   constant C_MENU_FLIP_JOYS     : natural := 6;
+   constant C_MENU_IMPROVE_AUDIO : natural := 7;
+   constant C_MENU_HDMI_16_9_50  : natural := 14;
+   constant C_MENU_HDMI_16_9_60  : natural := 15;
+   constant C_MENU_HDMI_4_3_50   : natural := 16;
+   constant C_MENU_HDMI_5_4_50   : natural := 17;
+   constant C_MENU_HDMI_640_60   : natural := 18;
+   constant C_MENU_HDMI_720_5994 : natural := 19;
+   constant C_MENU_HDMI_800_60   : natural := 20;
+   constant C_MENU_HDMI_FF       : natural := 22;
+   constant C_MENU_HDMI_DVI      : natural := 23;
+   constant C_MENU_CRT_EMULATION : natural := 26;
+   constant C_MENU_HDMI_ZOOM     : natural := 27;
+   constant C_MENU_VGA_STD       : natural := 31;
+   constant C_MENU_VGA_15KHZHSVS : natural := 35;
+   constant C_MENU_VGA_15KHZCS   : natural := 36;
    subtype  c_menu_osm_scaling is natural range 65 downto 57;
 
    signal   qnice_conf_wr : std_logic;
    signal   qnice_conf_ai : std_logic_vector(15 downto 0);
    signal   qnice_conf_di : std_logic_vector(7 downto 0);
-
-   signal   main_sid_type : std_logic_vector(1 downto 0);
-
-   signal   main_model: std_logic;
 
    -- QNICE signals passed down to main.vhd to handle IEC drives using vdrives.vhd
    signal   qnice_iec_qnice_ce   : std_logic;
@@ -377,13 +367,6 @@ begin
                            x"FF0000" when (main_reset_core_i or main_reset_from_prgloader) else
                            x"00FF00";
 
-   main_sid_type <= "01" when main_osm_control_i(C_MENU_SID_6581) else
-                    "10" when main_osm_control_i(C_MENU_SID_8580) else
-                    "00"; -- C_MENU_SID_NONE, default state
-
-   main_model <= '1' when main_osm_control_i(C_MENU_MODEL_PLUS4) else
-                 '0'; -- C_MENU_MODEL_C16, default state
-
    -- main.vhd contains the actual MiSTer core
    main_inst : entity work.main
       generic map (
@@ -478,7 +461,7 @@ begin
          iec_qnice_we_i         => qnice_iec_qnice_we,
 
          -- CBM-488/IEC serial (hardware) port
-         iec_hardware_port_en_i => main_osm_control_i(C_MENU_IEC),
+         iec_hardware_port_en_i => '0',
          iec_reset_n_o          => iec_reset_n_o,
          iec_atn_n_o            => iec_atn_n_o,
          iec_clk_en_o           => iec_clk_en_o,
@@ -582,8 +565,10 @@ begin
             qnice_iec_mount_buf_ram_we <= qnice_dev_we_i;
             qnice_dev_data_o           <= x"00" & qnice_iec_mount_buf_ram_data;
 
-         -- PRG file loader (*.PRG)
-         when C_DEV_PRG =>
+         -- Cartridge slot ROM loader
+         -- @TODO: interim: still served by prg_loader (always RESP_READY) so the OSD load
+         -- flow works end-to-end; replaced by two crtrom_loader instances in the next commit
+         when C_DEV_MSX_ROMA =>
             qnice_conf_ai      <= qnice_prg_ram_addr;
             qnice_conf_wr      <= qnice_prg_ram_we;
             qnice_conf_di      <= qnice_prg_ram_d_to;

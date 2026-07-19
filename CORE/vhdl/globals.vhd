@@ -76,11 +76,11 @@ constant VRAM_ADDR_WIDTH      : natural := f_log2(CHAR_MEM_SIZE);
 -- C16 specific devices
 ----------------------------------------------------------------------------------------------------------
 
-constant C_DEV_C16_RAM        : std_logic_vector(15 downto 0) := x"0100";     -- C16's main RAM
+constant C_DEV_C16_RAM        : std_logic_vector(15 downto 0) := x"0100";     -- C16's main RAM (dead: retire together with prg_loader)
 constant C_DEV_IEC_VDRIVES    : std_logic_vector(15 downto 0) := x"0101";     -- Virtual Device Management System
 constant C_DEV_IEC_MOUNT      : std_logic_vector(15 downto 0) := x"0102";     -- RAM to buffer disk images
-constant C_DEV_CRT            : std_logic_vector(15 downto 0) := x"0103";     -- SW cartridges (*.CRT)
-constant C_DEV_PRG            : std_logic_vector(15 downto 0) := x"0104";     -- PRG loader
+constant C_DEV_MSX_ROMB       : std_logic_vector(15 downto 0) := x"0103";     -- cartridge Slot B ROM loader
+constant C_DEV_MSX_ROMA       : std_logic_vector(15 downto 0) := x"0104";     -- cartridge Slot A ROM loader
 
 
 ----------------------------------------------------------------------------------------------------------
@@ -129,8 +129,13 @@ constant C_CRTROMTYPE_OPTIONAL   : std_logic_vector(15 downto 0) := x"0004";
 -- In case we are loading to a QNICE device, then the control and status register is located at the 4k window 0xFFFF.
 -- @TODO: See @TODO for more details about the control and status register
 constant C_CRTROMS_MAN_NUM       : natural := 2;                                       -- Amount of manually loadable ROMs and carts, maximum is 16
-constant C_CRTROMS_MAN           : crtrom_buf_array := ( C_CRTROMTYPE_DEVICE, C_DEV_PRG,
-                                                         C_CRTROMTYPE_DEVICE, C_DEV_CRT,
+-- Menu binding by order: 1st OPTM_G_LOAD_ROM item (Slot A) -> entry 0, 2nd (Slot B) -> entry 1
+-- @TODO: interim state until crtrom_loader.vhd lands: BOTH slots point at C_DEV_MSX_ROMA,
+-- which is still served by the old prg_loader (always answers RESP_READY), so that the OSD
+-- flow is testable and neither slot can hang the Shell's PARSEST poll loop. Change entry 1
+-- to C_DEV_MSX_ROMB in the same commit that instantiates the two crtrom_loaders.
+constant C_CRTROMS_MAN           : crtrom_buf_array := ( C_CRTROMTYPE_DEVICE, C_DEV_MSX_ROMA,
+                                                         C_CRTROMTYPE_DEVICE, C_DEV_MSX_ROMA,
                                                          x"EEEE");                     -- Always finish the array using x"EEEE"
 
 

@@ -101,16 +101,16 @@ _FFILES_DOFLT   MOVE    1, R8                   ; no: filter it
 _FFILES_1       CMP     CTX_LOAD_ROM, R10
                 RBRA    _FFILES_RET_0, !Z       ; do not filter in other CTXs
 
-                ; menu item "PRG:<Load>"
-                CMP     VIC20_OPTM_G_LOAD_PRG, R11
+                ; menu item "Slot A:<Load>"
+                CMP     VIC20_OPTM_G_LOAD_ROMA, R11
                 RBRA    _FFILES_2, !Z
-                MOVE    VIC20_PRGFILE, R9
+                MOVE    MSX_ROMFILE, R9
                 RBRA    _FFILES_3, 1
 
-                ; menu item "CRT:<Load>"
-_FFILES_2       CMP     VIC20_OPTM_G_MOUNT_CRT, R11
+                ; menu item "Slot B:<Load>"
+_FFILES_2       CMP     VIC20_OPTM_G_LOAD_ROMB, R11
                 RBRA    _FFILES_RET_0, !Z
-                MOVE    VIC20_CRTFILE, R9
+                MOVE    MSX_ROMFILE, R9
 
                 ; does this file have the right file extension?
 _FFILES_3       RSUB    M2M$CHK_EXT, 1
@@ -300,8 +300,7 @@ WRN_NO_D64      .ASCII_P "This core uses D64 disk images.\n\n"
 
 ; VIC20 specific file extensions (need to be upper case)
 VIC20_IMGFILE_D64 .ASCII_W ".D64"
-VIC20_CRTFILE     .ASCII_W ".CRT"
-VIC20_PRGFILE     .ASCII_W ".PRG"
+MSX_ROMFILE       .ASCII_W ".ROM"
 
 ; VIC20 disk image types
 VIC20_IMGTYPE_D64 .EQU    0x0000  ; 1541 emulated GCR: D64
