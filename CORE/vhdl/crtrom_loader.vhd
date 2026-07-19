@@ -119,6 +119,11 @@ architecture beh of crtrom_loader is
    signal isrom_s           : std_logic := '0';
    signal rom_enabled       : std_logic := '0';
 
+   attribute async_reg : string;
+   attribute async_reg of ack_toggle_m, ack_toggle_s,
+                          req_toggle_m, req_toggle_s,
+                          isrom_m, isrom_s : signal is "true";
+
 begin
 
    ---------------------------------------------------------------------------
