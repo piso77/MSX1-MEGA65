@@ -4,7 +4,7 @@
 -- Configuration data for the Shell
 --
 -- based on VIC20MEGA65 by MJoergen and sy2002 in 2023
--- based on C16_MiSTer by the MiSTer development team
+-- based on MSX1_MiSTer by the MiSTer development team
 -- port done by Paolo Pisati <p.pisati@gmail.com> in 2026 and licensed under GPL v3
 ----------------------------------------------------------------------------------
 
@@ -46,7 +46,7 @@ constant WHS_RECORDS   : natural := 2;
 
 -- define the maximum amount of pages per WHS array element: between 1 and 256
 -- (this is necessary because Vivado does not support unconstrained arrays in a record)
-constant WHS_MAX_PAGES : natural := 3;
+constant WHS_MAX_PAGES : natural := 2;
 
  -- !!! DO NOT TOUCH !!!
 constant SEL_WHS           : std_logic_vector(15 downto 0) := x"1000";
@@ -78,12 +78,12 @@ type WHS_RECORD_ARRAY_TYPE is array (0 to WHS_RECORDS - 1) of WHS_RECORD_TYPE;
 
 constant SCR_WELCOME : string :=
 
-   "\n C16 for MEGA65 Version 0.1\n\n" &
+   "\n MSX1 for MEGA65 V0.1 WIP\n\n" &
 
    " Powered by MiSTer2MEGA65\n\n\n" &
 
-   " While the C16 is running: Press HELP\n" &
-   " to mount drives & to configure the core.\n\n" &
+   " While the MSX1 is running: Press HELP\n" &
+   " to load ROMs & to configure the core.\n\n" &
 
    " Both SD card slots work: The card in the\n" &
    " back has higher precedence than the\n" &
@@ -97,21 +97,23 @@ constant SCR_WELCOME : string :=
 
 constant HELP_1 : string :=
 
-   "\n C16 for MEGA65 Version 0.1\n" &
+   "\n MSX1 for MEGA65 V0.1 WIP\n" &
 
    " Powered by MiSTer2MEGA65\n\n" &
 
    " Quickstart:\n\n" &
 
-   " * Create a /c16 folder on your SD card\n" &
-   "   place your D64, CRT and PRG files there\n" &
+   " * Create a /msx1 folder on your SD card\n" &
+   "   and place your ROM files there\n" &
+   " * Load cartridges via Slot A / Slot B:\n" &
+   "   up to 256 KB per slot\n" &
    " * You can work with long file names and\n" &
    "   with arbitrary sub-folders\n" &
    " * Both SD card slots are supported. Back\n" &
    "   slot takes precedence over bottom slot\n" &
-   " * Copy the c16mega65 config file to your\n" &
-   "   /c16 folder so that your menu settings\n" &
-   "   are being saved\n" &
+   " * Copy the msx1mega65 config file to\n" &
+   "   your /msx1 folder so that your menu\n" &
+   "   settings are being saved\n" &
    " * If you use any analog display device\n" &
    "   via the VGA port, disable HDMI:\n" &
    "   Flicker-free to avoid glitches\n" &
@@ -119,12 +121,12 @@ constant HELP_1 : string :=
    "   sure that you enable HDMI: Flicker-free\n" &
    "   and that you run the core at 50 Hz\n" &
 
-   " Cursor right to learn more.       (1 of 3)\n" &
+   " Cursor right to learn more.       (1 of 2)\n" &
    " Press Space to close the help screen.";
 
 constant HELP_2 : string :=
 
-   "\n C16 for MEGA65 Version 0.1\n\n" &
+   "\n MSX1 for MEGA65 V0.1 WIP\n\n" &
 
    " When browsing the menu:\n\n" &
 
@@ -132,47 +134,27 @@ constant HELP_2 : string :=
    " Run/Stop: Leave sub-menu\n" &
    " Settings are saved when closing the menu\n\n" &
 
-   " When browsing for D64, CRT and PRG:\n\n" &
+   " When browsing for ROMs:\n\n" &
 
    " Cursor up/down:     File up/down\n" &
    " Cursor left/right:  Page up/down\n" &
    " Run/Stop:           Cancel browsing\n" &
    " F1:                 Bottom SD card\n" &
    " F3:                 Back SD card\n" &
-   " Enter:              Mount drive\n" &
-   "                     Load CRT or PRG\n" &
-   " Space:              Unmount drive\n\n" &
+   " Enter:              Load ROM\n\n" &
 
    " System reset:\n\n" &
 
    " Press the reset button shortly to just\n" &
-   " reset the C16 core and press the button\n" &
+   " reset the MSX1 core and press the button\n" &
    " longer than 1.5s to reset the MEGA65.\n" &
-   " A short reset also restarts cartridges.\n\n" &
+   " A loaded cartridge survives short resets.\n\n" &
 
-   " Crsr left: Prev  Crsr right: Next (2 of 3)\n" &
-   " Press Space to close the help screen.";
-
-constant HELP_3 : string :=
-
-   "\n C16 for MEGA65 Version 0.1\n\n" &
-
-   " IEC:\n\n" &
-
-   " Never run an external device that has the\n" &
-   " drive id #8. Always use #9 or higher.\n\n" &
-
-   " Writing to disk images:\n\n" &
-
-   " Wait until the drive led is done turning\n" &
-   " from green to yellow back and forth and\n" &
-   " is off again before unmount, reset or OFF.\n\n" &
-
-   " Cursor left to go back.           (3 of 3)\n" &
+   " Cursor left to go back.           (2 of 2)\n" &
    " Press Space to close the help screen.";
 
 -- Concatenate all your Welcome and Help screens into one large string, so that during synthesis one large string ROM can be build.
-constant WHS_DATA : string := SCR_WELCOME & HELP_1 & HELP_2 & HELP_3;
+constant WHS_DATA : string := SCR_WELCOME & HELP_1 & HELP_2;
 
 -- The WHS array needs the start address of each page. As a best practice: Just define some constants, that you can name for example
 -- just like you named the string constants and then add _START. Use the 'length attribute of VHDL to add up all previous strings
@@ -181,20 +163,19 @@ constant WHS_DATA : string := SCR_WELCOME & HELP_1 & HELP_2 & HELP_3;
 constant SCR_WELCOME_START : natural := 0;
 constant HELP_1_START      : natural := SCR_WELCOME'length;
 constant HELP_2_START      : natural := HELP_1_START + HELP_1'length;
-constant HELP_3_START      : natural := HELP_2_START + HELP_2'length;
 
 -- Fill the WHS array with page start addresses and the length of each page.
 -- Make sure that array element 0 is always your Welcome page. If you don't use a welcome page, fill everything with zeros.
 constant WHS : WHS_RECORD_ARRAY_TYPE := (
    --- Welcome Screen
    (page_count    => 1,
-    page_start    => (SCR_WELCOME_START,  0, 0),
-    page_length   => (SCR_WELCOME'length, 0, 0)),
+    page_start    => (SCR_WELCOME_START,  0),
+    page_length   => (SCR_WELCOME'length, 0)),
 
    --- Help pages
-   (page_count    => 3,
-    page_start    => (HELP_1_START,  HELP_2_START,  HELP_3_START),
-    page_length   => (HELP_1'length, HELP_2'length, HELP_3'length))
+   (page_count    => 2,
+    page_start    => (HELP_1_START,  HELP_2_START),
+    page_length   => (HELP_1'length, HELP_2'length))
 );
 
 --------------------------------------------------------------------------------------------------------------------
@@ -287,7 +268,7 @@ constant SEL_CORENAME      : std_logic_vector(15 downto 0) := x"0200";
 
 -- Currently this is only used in the debug console. Use the welcome screen and the
 -- help system to display the name and version of your core to the end user
-constant CORENAME          : string := "C16 for MEGA65 Version 0.1";
+constant CORENAME          : string := "MSX1 for MEGA65 V0.1 WIP";
 
 --------------------------------------------------------------------------------------------------------------------
 -- "Help" menu / Options menu  (Selectors 0x0300 .. 0x0312): DO NOT TOUCH
